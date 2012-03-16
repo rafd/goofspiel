@@ -1,0 +1,9 @@
+{
+    "name": "goofspiel"
+  , "version": "0.0.1"
+  , "private": true
+  , "dependencies": {
+      "zappa": "0.3.3"
+    , "jade": "0.21.0"
+  }
+}
