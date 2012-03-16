@@ -20,6 +20,7 @@ Game = db.model 'Game', new mongoose.Schema
 require('zappa') ->
   
   @use 'zappa'
+  @use @express.bodyParser()
   @enable 'default layout'
   
   # ROUTES
@@ -30,18 +31,21 @@ require('zappa') ->
       @render 'index.coffee', {bots: bots}
 
 
-  @get '/new': 'new'
+  @get '/new': ->
+    @render 'new.coffee'
 
-  @post '/create': 'create'
+  @post '/create': ->
     # db: create bot from params
+    bot = new Bot(@body.bot)
+    bot.save =>
+      @redirect "/bot/#{bot._id}"
 
   @get '/bot/:id': ->
     # db: get bot
     Bot.findById @params.id, (e, bot) =>
       @render 'bot.coffee', {bot: bot}
     
-
-  @get '/game/:id': 'game'
+  @get '/game/:id': ->
     # db: get game
     Game.findById @params.id, (e, game) =>
       @render 'game.coffee', {game: game}

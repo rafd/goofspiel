@@ -1,3 +1,4 @@
+a href: "new", -> "new bot"
 table ->
   thead ->
     tr ->
