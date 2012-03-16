@@ -1,4 +1,5 @@
 mongoose = require('mongoose')
+hash = require('node_hash')
 
 db = mongoose.connect(process.env.MONGOLAB_URI || 'mongodb://localhost/goofspiel')
 
@@ -44,6 +45,13 @@ require('zappa') ->
     # db: get bot
     Bot.findById @params.id, (e, bot) =>
       @render 'bot.coffee', {bot: bot}
+
+  @post '/compete/:id': ->
+    # check that body.secret matches bot.secret
+
+    Bot.findById @params.id, (e, bot) =>
+      if @body.secret == bot.secret
+        @render 'compete.coffee', {bot: bot, scripts: ['/zappa/jquery','/socket.io/socket.io.js','/compete']}
     
   @get '/game/:id': ->
     # db: get game
@@ -63,7 +71,7 @@ require('zappa') ->
     @redirect '/'
 
 
-  @coffee '/app.js': ->
+  @coffee '/compete.js': ->
     $ =>
       alert('hello')
 
