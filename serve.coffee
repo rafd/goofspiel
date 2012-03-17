@@ -11,6 +11,8 @@ Bot = db.model 'Bot', new mongoose.Schema
 
 Game = db.model 'Game', new mongoose.Schema
   players: []
+  bots: []
+  player_bots: {}
   turn: Number
   turns: [{}]
   cards: []
@@ -18,6 +20,8 @@ Game = db.model 'Game', new mongoose.Schema
   reveal: Number
   submitted_moves: []
   active: Boolean
+  bids: {}
+  scores: {}
 
 require('zappa') ->
   
@@ -108,8 +112,9 @@ require('zappa') ->
     socket.on 'disconnect', () ->
       console.log "goodbye player #{@id}"
       #TODO: forfeit the game
+      id = @id
       Game.findById PLAYERS[@id].game, (err,game)->
-        end_game(game) if game
+        end_game(game, id) if game
 
       AVAILABLE.remove(@id)
       delete PLAYERS[@id]
@@ -164,9 +169,23 @@ require('zappa') ->
     console.log 'creating game'
     game = new Game
       players: [p1, p2]
+      bots: [PLAYERS[p1].id, PLAYERS[p2].id]
+      player_bots: {}
       turn: 0
       cards: [1,2,3,4,5,6,7,8,9,10,11,12,13]
       active: true
+      forfeit: null
+      bids: {}
+      scores: {}
+
+    game.bids[p1] = 0
+    game.bids[p2] = 0
+
+    game.scores[p1] = 0
+    game.scores[p2] = 0
+
+    game.player_bots[p1] = PLAYERS[p1].id
+    game.player_bots[p2] = PLAYERS[p2].id
 
     console.log 'saving game'
 
@@ -207,10 +226,21 @@ require('zappa') ->
     a = {}
     a.turn = 0+game.turn
     a.reveal = 0+game.reveal
-    a.cards = _.clone(game.submitted_moves)
+    a.cards = _.extend(game.submitted_moves[0],game.submitted_moves[1])
     game.prev_turn = a
+    
+    game.bids[game.players[0]] += a.cards[game.players[0]]
+    game.bids[game.players[1]] += a.cards[game.players[1]]
 
-    Game.update {_id:game._id}, { $set: {submitted_moves: []} }, {}, ()->
+    if a.cards[game.players[0]] > a.cards[game.players[1]]
+      game.scores[game.players[0]] += a.reveal
+    else if a.cards[game.players[1]] > a.cards[game.players[0]]
+      game.scores[game.players[1]] += a.reveal
+
+    bids = _.clone game.bids
+    scores = _.clone game.scores
+
+    Game.update {_id:game._id}, { $set: {submitted_moves: [], bids: bids, scores: scores }}, {}, ()->
       console.log 'storing turn' 
 
       Game.update {_id:game._id}, {$push: {turns: a}}, {}, (err, num)->
@@ -219,10 +249,46 @@ require('zappa') ->
         next_turn(game)
 
 
-  end_game = (game) ->
-    console.log 'end game'
+  end_game = (game, forfeit) ->
+    console.log "end game #{game._id}"
+
+    forfeit = forfeit || null
     # TODO: determine winner and store winner
-    Game.update {_id:game._id}, {$set : {submitted_moves : [], active: false}}, {}
+    Game.update {_id:game._id}, {$set : {submitted_moves : [], active: false, forfeit: forfeit}}, {}, (err, num)->
+      console.log num
+
+    # CALCULATE RESULT
+
+    win = null
+    lose = null
+    tie = null
+    cheat = null
+
+    if forfeit
+      win = game.player_bots[_.without(game.players, forfeit)[0]]
+      lose = game.player_bots[forfeit] 
+    else if game.bids[game.players[0]] != 91
+      win = game.player_bots[game.players[1]]
+      lose = game.player_bots[game.players[0]]
+      cheat = game.player_bots[game.players[0]]
+    else if game.bids[game.players[1]] != 91
+      win = game.player_bots[game.players[0]]
+      lose = game.player_bots[game.players[1]]
+      cheat = game.player_bots[game.players[1]]
+    else
+      if game.scores[game.players[0]] > game.scores[game.players[1]]
+        win = game.player_bots[game.players[0]]
+        lose = game.player_bots[game.players[1]]
+      else if game.scores[game.players[1]] > game.scores[game.players[0]]
+        win = game.player_bots[game.players[1]]
+        lose = game.player_bots[game.players[0]]
+      else
+        tie = true
+
+    Game.update {_id:game._id}, {$set : {win : win, lose: lose, tie: tie, cheat: cheat}}, {}, (err, num)->
+      console.log num
+
+    # CLEAN UP
 
     delete GAMES[game._id]
 
