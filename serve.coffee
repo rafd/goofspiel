@@ -1,5 +1,6 @@
 mongoose = require('mongoose')
 hash = require('node_hash')
+_ = require('underscore')
 
 db = mongoose.connect(process.env.MONGOLAB_URI || 'mongodb://localhost/goofspiel')
 
@@ -8,20 +9,20 @@ Bot = db.model 'Bot', new mongoose.Schema
   secret: String
   code: String
 
-Turn = new mongoose.Schema
-  num: Number
-  p1: Number
-  p2: Number
-
 Game = db.model 'Game', new mongoose.Schema
-  p1: mongoose.Schema.ObjectId
-  p2: mongoose.Schema.ObjectId
-  turns: [Turn]
+  players: []
+  turn: Number
+  turns: [{}]
+  cards: []
+  prev_turn: {}
+  reveal: Number
+  submitted_moves: []
 
 require('zappa') ->
   
   @use 'zappa'
   @use @express.bodyParser()
+  @use @express.static(__dirname + '/public')
   @enable 'default layout'
   
   # ROUTES
@@ -51,7 +52,7 @@ require('zappa') ->
 
     Bot.findById @params.id, (e, bot) =>
       if @body.secret == bot.secret
-        @render 'compete.coffee', {bot: bot, scripts: ['/zappa/jquery','/socket.io/socket.io.js','/compete']}
+        @render 'compete.coffee', {bot: bot, scripts: ['/zappa/jquery','/socket.io/socket.io.js','/underscore','/bot']}
     
   @get '/game/:id': ->
     # db: get game
@@ -70,9 +71,154 @@ require('zappa') ->
 
     @redirect '/'
 
+  PLAYERS = {}
 
-  @coffee '/compete.js': ->
-    $ =>
-      alert('hello')
+  GAMES = {}
 
-  # SOCKET ROUTES
+  AVAILABLE =
+    data: {}
+    length: 0
+    add: (id)->
+      @data[id] = true
+      @length += 1
+    remove: (id)->
+      delete @data[id]
+      @length -= 1
+    popRandom: ->
+      key = _.keys(@data)[Math.floor(Math.random()*@length)]
+      @remove(key)
+      return key
+
+  @io.sockets.on 'connection', (socket) ->
+
+    socket.on 'player:enter', (id, fn) ->
+      console.log "welcome player #{@id}"
+
+      PLAYERS[@id] =
+        socket: socket
+        id: id
+        game: null
+      
+      AVAILABLE.add(@id)
+
+
+    socket.on 'disconnect', () ->
+      console.log "goodbye player #{@id}"
+      #TODO: forfeit the game
+      AVAILABLE.remove(@id)
+      delete PLAYERS[@id]
+
+    socket.on 'game:play', (card) ->
+      id = @id
+      
+      console.log('move received for player '+id)
+      
+      # figure out which game the player is in
+      Game.findById PLAYERS[id].game, (err, game) ->
+        if game
+          console.log('game found for player '+id)
+          # TODO: if move is invalid
+          if false
+            # TODO: forfeit
+          # else
+          else
+            # add to turns
+            a = {}
+            a[id] = card
+
+            Game.update {_id:game._id}, { $push: { submitted_moves : a }}, {}, (e, num) ->
+              console.log "#{num} updated"
+
+
+  matchmake = ->
+    console.log 'matchmaking'
+
+    if AVAILABLE.length >= 2
+      start_game(AVAILABLE.popRandom(),AVAILABLE.popRandom())
+    else
+      console.log 'not enough players to matchmake'
+    
+    setTimeout matchmake, 1000
+
+  matchmake()
+
+  check_games = ->
+    console.log 'checking games'
+
+    Game.find {submitted_moves : { $size : 2 }, turn : { $lt : 14}}, (err, games) ->
+      for game, state in games
+        resolve_turn(game)
+      setTimeout check_games, 1000
+
+  check_games()
+
+  start_game = (p1,p2) ->
+    console.log 'creating game'
+    game = new Game
+      players: [p1, p2]
+      turn: 0
+      cards: [1,2,3,4,5,6,7,8,9,10,11,12,13]
+
+    console.log 'saving game'
+
+    PLAYERS[p1].game = game._id
+    PLAYERS[p2].game = game._id
+
+    GAMES[game._id] = true
+    
+    game.save ->
+      next_turn(game)
+
+  next_turn = (game) ->
+    console.log('next turn for '+game._id)
+
+    # if turn == 13, end game
+    if game.turn >= 13
+      end_game(game)
+    else
+      # choose a card
+      card = game.cards[Math.floor(Math.random()*game.cards.length)]
+      turn = game.turn + 1
+      prev_turn = game.prev_turn
+
+      # remove the card & increment turn
+      Game.update {_id:game._id}, { $inc: { turn : 1 }, $pull: { cards : card }, $set: {reveal:card}}, {}, (e, num) ->
+        console.log "#{num} updated"
+
+        # broadcast
+        console.log 'broadcasting reveal'
+        PLAYERS[game.players[0]].socket.emit 'game:reveal', turn, card, prev_turn
+        PLAYERS[game.players[1]].socket.emit 'game:reveal', turn, card, prev_turn
+
+      
+
+  resolve_turn = (game) ->
+    console.log 'resolving turn'
+    #, reveal: game.reveal, cards: game.submitted_moves}
+    a = {}
+    a.turn = 0+game.turn
+    a.reveal = 0+game.reveal
+    a.cards = _.clone(game.submitted_moves)
+    game.prev_turn = a
+
+    Game.update {_id:game._id}, { $set: {submitted_moves: []} }, {}, ()->
+      console.log 'storing turn' 
+
+      Game.update {_id:game._id}, {$push: {turns: a}}, {}, (err, num)->
+        console.log err
+        console.log num
+        next_turn(game)
+
+
+  end_game = (game) ->
+    console.log 'end game'
+    # TODO: determine winner and store winner
+    Game.update {_id:game._id}, {$set : {submitted_moves : []}}, {}
+
+    delete GAMES[game._id]
+
+    PLAYERS[game.players[0]].game = null
+    PLAYERS[game.players[1]].game = null
+
+    AVAILABLE.add(game.players[0])
+    AVAILABLE.add(game.players[1])
