@@ -17,6 +17,7 @@ Game = db.model 'Game', new mongoose.Schema
   prev_turn: {}
   reveal: Number
   submitted_moves: []
+  active: Boolean
 
 require('zappa') ->
   
@@ -79,11 +80,13 @@ require('zappa') ->
     data: {}
     length: 0
     add: (id)->
-      @data[id] = true
-      @length += 1
+      unless @data[id]
+        @data[id] = true
+        @length += 1
     remove: (id)->
-      delete @data[id]
-      @length -= 1
+      if @data[id]
+        delete @data[id]
+        @length -= 1
     popRandom: ->
       key = _.keys(@data)[Math.floor(Math.random()*@length)]
       @remove(key)
@@ -105,6 +108,9 @@ require('zappa') ->
     socket.on 'disconnect', () ->
       console.log "goodbye player #{@id}"
       #TODO: forfeit the game
+      Game.findById PLAYERS[@id].game, (err,game)->
+        end_game(game) if game
+
       AVAILABLE.remove(@id)
       delete PLAYERS[@id]
 
@@ -137,6 +143,7 @@ require('zappa') ->
       start_game(AVAILABLE.popRandom(),AVAILABLE.popRandom())
     else
       console.log 'not enough players to matchmake'
+
     
     setTimeout matchmake, 1000
 
@@ -145,9 +152,10 @@ require('zappa') ->
   check_games = ->
     console.log 'checking games'
 
-    Game.find {submitted_moves : { $size : 2 }, turn : { $lt : 14}}, (err, games) ->
+    Game.find {submitted_moves : { $size : 2 }, turn : { $lt : 14}, active : true}, (err, games) ->
       for game, state in games
-        resolve_turn(game)
+        if GAMES[game._id]
+          resolve_turn(game)
       setTimeout check_games, 1000
 
   check_games()
@@ -158,6 +166,7 @@ require('zappa') ->
       players: [p1, p2]
       turn: 0
       cards: [1,2,3,4,5,6,7,8,9,10,11,12,13]
+      active: true
 
     console.log 'saving game'
 
@@ -213,12 +222,12 @@ require('zappa') ->
   end_game = (game) ->
     console.log 'end game'
     # TODO: determine winner and store winner
-    Game.update {_id:game._id}, {$set : {submitted_moves : []}}, {}
+    Game.update {_id:game._id}, {$set : {submitted_moves : [], active: false}}, {}
 
     delete GAMES[game._id]
 
-    PLAYERS[game.players[0]].game = null
-    PLAYERS[game.players[1]].game = null
+    PLAYERS[game.players[0]].game = null if PLAYERS[game.players[0]]
+    PLAYERS[game.players[1]].game = null if PLAYERS[game.players[1]]
 
-    AVAILABLE.add(game.players[0])
-    AVAILABLE.add(game.players[1])
+    AVAILABLE.add(game.players[0]) if PLAYERS[game.players[0]]
+    AVAILABLE.add(game.players[1]) if PLAYERS[game.players[1]]
