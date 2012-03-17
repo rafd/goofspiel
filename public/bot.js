@@ -13,7 +13,7 @@ window.BotReady = function(){
 
   window.socket.on('game:reveal', function(turn, card, prev_turn) {
       console.log('game:reveal turn:'+turn+' card:'+card+' prev_turn:'+prev_turn)
-      window.Bot.turn(turn, card, prev_turn);
+      window.BotTurn(turn, card, prev_turn);
   });
 
   window.play = function(card_to_play){
@@ -29,6 +29,7 @@ window.BotReady = function(){
 
 // RANDOM BOT
 
+/*
 RandomBot = {};
 
 RandomBot.turn = function(turn, card, prev_turn){
@@ -42,8 +43,9 @@ RandomBot.turn = function(turn, card, prev_turn){
   window.play(card_to_play);
 }
 
-window.Bot = RandomBot;
+window.BotTurn = RandomBot.turn;
 window.BotReady();
+*/
 
 /*
 // AT-COST BOT
