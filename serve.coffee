@@ -53,6 +53,9 @@ require('zappa') ->
     bot.save =>
       @redirect "/bot/#{bot._id}"
 
+  @get '/sample': ->
+    @render 'sample.coffee'
+
   @get '/bot/:id': ->
     # db: get bot
     Bot.findById @params.id, (e, bot) =>
@@ -234,7 +237,7 @@ require('zappa') ->
     a.turn = 0+game.turn
     a.reveal = 0+game.reveal
     a.cards = _.extend(game.submitted_moves[0],game.submitted_moves[1])
-    game.prev_turn = a
+    game.prev_turn = [a.reveal, a.cards[game.players[0]], a.cards[game.players[1]] ]
     
     game.bids[game.players[0]] += a.cards[game.players[0]]
     game.bids[game.players[1]] += a.cards[game.players[1]]

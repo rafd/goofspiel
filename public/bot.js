@@ -2,7 +2,7 @@
 /// BEHIND THE SCENES
 
 window.BotReady = function(){
-  window.socket = io.connect('http://localhost')
+  window.socket = io.connect('/')
 
   window.socket.on('connect', function(){
     console.log('player:enter');
@@ -30,42 +30,11 @@ window.BotReady = function(){
 // RANDOM BOT
 
 /*
-RandomBot = {};
 
-RandomBot.turn = function(turn, card, prev_turn){
-  if(turn === 1){
-    this.cards = [1,2,3,4,5,6,7,8,9,10,11,12,13];
-  }
-
-  card_to_play = this.cards[Math.floor(Math.random()*this.cards.length)];
-  this.cards = _.without(this.cards,card_to_play);
-
-  window.play(card_to_play);
-}
-
-window.BotTurn = RandomBot.turn;
-window.BotReady();
 */
 
 /*
 // AT-COST BOT
 
-AtCostBot = {};
 
-AtCostBot.start = function(ack_cb){
-  ack_cb();
-}
-
-AtCostBot.play = function(prev_turn, card, play_cb){
-  card_to_play = card;
-
-  play_cb(card_to_play);
-}
-
-AtCostBot.end = function(prev_turn, ack_cb){
-  ack_cb();
-}
-
-window.Bot = AtCostBot;
-window.BotReady();
 */
