@@ -8,6 +8,9 @@ Bot = db.model 'Bot', new mongoose.Schema
   name: String
   secret: String
   code: String
+  win: {}
+  lose: {}
+  tie: {}
 
 Game = db.model 'Game', new mongoose.Schema
   players: []
@@ -22,6 +25,9 @@ Game = db.model 'Game', new mongoose.Schema
   active: Boolean
   bids: {}
   scores: {}
+  win: {}
+  lose: {}
+  tie: {}
 
 require('zappa') ->
   
@@ -50,7 +56,8 @@ require('zappa') ->
   @get '/bot/:id': ->
     # db: get bot
     Bot.findById @params.id, (e, bot) =>
-      @render 'bot.coffee', {bot: bot}
+      Game.find {bots : @params.id}, (e, games) =>
+        @render 'bot.coffee', {bot: bot, games: games, e: e}
 
   @post '/compete/:id': ->
     # check that body.secret matches bot.secret
@@ -287,6 +294,20 @@ require('zappa') ->
 
     Game.update {_id:game._id}, {$set : {win : win, lose: lose, tie: tie, cheat: cheat}}, {}, (err, num)->
       console.log num
+
+    if tie
+      Bot.update {_id:game.player_bots[game.players[1]]}, {$inc : {tie : 1}}, {}, (err,num) ->
+        console.log num
+      Bot.update {_id:game.player_bots[game.players[0]]}, {$inc : {tie : 1}}, {}, (err,num) ->
+        console.log num
+    else
+      Bot.update {_id:win}, {$inc : {win : 1}}, {}, (err,num) ->
+        console.log num
+
+      Bot.update {_id:lose}, {$inc : {lose: 1}}, {}, (err,num) ->
+        console.log num
+
+
 
     # CLEAN UP
 
