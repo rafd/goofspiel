@@ -1,6 +1,6 @@
 # goofspiel.js
 
-Goofspiel tournament server. 
+[Goofspiel](http://en.wikipedia.org/wiki/Goofspiel) tournament server. 
 Write bots in javascript, run in browser, participate in faceoffs with others via sockets.
 
 ## Installation
