@@ -2,7 +2,7 @@
 /// BEHIND THE SCENES
 
 window.BotReady = function(){
-  window.socket = io.connect('/')
+  window.socket = io.connect('/', {"reconnect":false})
 
   window.socket.on('connect', function(){
     console.log('player:enter');
@@ -12,12 +12,17 @@ window.BotReady = function(){
   });
 
   window.socket.on('game:reveal', function(turn, card, prev_turn) {
-      console.log('game:reveal turn:'+turn+' card:'+card+' prev_turn:'+prev_turn)
+      msg = 'game:reveal turn:'+turn+' card:'+card+' prev_turn:'+prev_turn;
+      console.log(msg);
+      $("p.log").append('<p>'+msg+'</p>');
       window.BotTurn(turn, card, prev_turn);
   });
 
   window.play = function(card_to_play){
-    console.log('game:play '+card_to_play);
+    msg = 'game:play '+card_to_play
+    console.log(msg);
+    $("p.log").append('<p>'+msg+'</p>');
+      
     window.socket.emit('game:play', card_to_play);
   }
 }

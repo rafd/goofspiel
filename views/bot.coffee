@@ -16,8 +16,16 @@ ul ->
     li -> 
       a href: "/game/#{game._id}", ->
         if "#{@bot._id}" == "#{game.win}"
-          p "win"
+          "win"
         else if game.tie
-          p "tie"
+          "tie"
         else
-          p "lose"
+          "lose"
+
+      span -> " vs "
+
+      if ""+game.bots[0] != ""+@bot._id
+        a href: "/bot/#{game.bots[0]}", -> game.bots[0]
+      if ""+game.bots[1] != ""+@bot._id
+        a href: "/bot/#{game.bots[1]}", -> game.bots[1]
+      

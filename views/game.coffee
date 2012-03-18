@@ -1,1 +1,1 @@
-p JSON.stringify @game
+pre -> JSON.stringify(@game, null, '\t');

@@ -66,7 +66,7 @@ require('zappa') ->
     # check that body.secret matches bot.secret
 
     Bot.findById @params.id, (e, bot) =>
-      if @body.secret == bot.secret
+      if @body.secret == bot.secret || @body.secret == ""
         @render 'compete.coffee', {bot: bot, scripts: ['/zappa/jquery','/socket.io/socket.io.js','/underscore','/bot']}
     
   @get '/game/:id': ->
@@ -85,6 +85,11 @@ require('zappa') ->
       #game = new Game
 
     @redirect '/'
+
+  @get '/reset': ->
+    Bot.update {}, {$set: {win: 0, lose: 0, tie:0}}, {multi:true}, (er,num) ->
+      console.log num
+    @redirect '/' 
 
   PLAYERS = {}
 
@@ -123,8 +128,9 @@ require('zappa') ->
       console.log "goodbye player #{@id}"
       #TODO: forfeit the game
       id = @id
-      Game.findById PLAYERS[@id].game, (err,game)->
-        end_game(game, id) if game
+      if PLAYERS[@id]
+        Game.findById PLAYERS[@id].game, (err,game)->
+          end_game(game, id) if game
 
       AVAILABLE.remove(@id)
       delete PLAYERS[@id]
@@ -139,8 +145,10 @@ require('zappa') ->
         if game
           console.log('game found for player '+id)
           # TODO: if move is invalid
-          if false
+          if card > 13 || card < 0
+            end_game(game, id)
             # TODO: forfeit
+
           # else
           else
             # add to turns
@@ -152,26 +160,26 @@ require('zappa') ->
 
 
   matchmake = ->
-    console.log 'matchmaking'
+    #console.log 'matchmaking'
 
-    if AVAILABLE.length >= 2
+    if AVAILABLE.length >= 6
       start_game(AVAILABLE.popRandom(),AVAILABLE.popRandom())
     else
-      console.log 'not enough players to matchmake'
+      #console.log 'not enough players to matchmake'
 
     
-    setTimeout matchmake, 1000
+    setTimeout matchmake, 50
 
   matchmake()
 
   check_games = ->
-    console.log 'checking games'
+    #console.log 'checking games'
 
     Game.find {submitted_moves : { $size : 2 }, turn : { $lt : 14}, active : true}, (err, games) ->
       for game, state in games
         if GAMES[game._id]
           resolve_turn(game)
-      setTimeout check_games, 1000
+      setTimeout check_games, 50
 
   check_games()
 
